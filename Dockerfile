@@ -63,6 +63,12 @@ ENV XDG_CACHE_HOME="/data/.cache"
 ########################################
 FROM runtimes AS dependencies
 
+# 【修复点 1】必须在 dependencies 阶段重新安装 curl，否则会报 exit code 127
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
 ARG OPENCLAW_BETA=false
 ENV OPENCLAW_BETA=${OPENCLAW_BETA} \
     OPENCLAW_NO_ONBOARD=1 \
@@ -85,11 +91,11 @@ RUN --mount=type=cache,target=/data/.npm \
     npm install -g openclaw; \
     fi 
 
-# Install uv explicitly
-RUN curl -L https://github.com/azlux/uv/releases/latest/download/uv-linux-x64 -o /usr/local/bin/uv && \
+# 【修复点 2】更正 uv 下载路径为官方 release 路径，并确保路径存在
+RUN curl -LsSf https://github.com/astral-sh/uv/releases/latest/download/uv-linux-x86_64 -o /usr/local/bin/uv && \
     chmod +x /usr/local/bin/uv
 
-# Claude + Kimi
+# Claude + Kimi 安装脚本
 RUN curl -fsSL https://claude.ai/install.sh | bash && \
     curl -L https://code.kimi.com/install.sh | bash && \
     command -v uv
@@ -110,6 +116,10 @@ RUN ln -sf /data/.claude/bin/claude /usr/local/bin/claude || true && \
     ln -sf /data/.kimi/bin/kimi /usr/local/bin/kimi || true && \
     chmod +x /app/scripts/*.sh
 
-ENV PATH="/root/.local/bin:/usr/local/go/bin:/usr/local/bin:/usr/bin:/bin:/data/.bun/bin:/data/.bun/install/global/bin:/data/.claude/bin:/data/.kimi/bin"
+# 设置最终运行环境的 PATH
+ENV PATH="/root/.local/bin:/usr/local/go/bin:/usr/local/bin:/usr/bin:/bin:/data/.bun/bin:/data/.bun/install/global/bin:/data/.claude/bin:/data/.kimi/bin:${PATH}"
+
 EXPOSE 18789
+
+# 补充启动命令（基于你之前的截图逻辑）
 CMD ["bash", "/app/scripts/bootstrap.sh"]
